@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  postgress:
+    image: postgres:13
+    container_name: 0bbc0088a9f2717863d729d03dfb9d7c43c6ccaba688806f013d071f66b4d637
+    environment:
+      POSTGRES_USER: dcportal
+      POSTGRES_PASSWORD: dcportal
+      POSTGRES_DB: football
+    ports:
+      - "5432:5432"
+    volumes:
+      - 0bbc0088a9f2717863d729d03dfb9d7c43c6ccaba688806f013d071f66b4d637:/var/lib/postgresql/data
+    
+  app:
+    image: football-app:latest
+    container_name: football_app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgress
+    environment:
+      DATABASE_URL: postgresql://dcportal:dcportal@localhost:5432/football
+      DB_HOST: postgress
+      DB_PORT: 5432
+      DB_NAME: football
+      DB_USER: dcportal
+      DB_PASSWORD: dcportal

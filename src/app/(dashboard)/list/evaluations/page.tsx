@@ -224,7 +224,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import FormModal from "@/components/FormModal";
 import prisma from "@/lib/prisma";
-import { Evaluation, PlayerProfile, CoachProfile, User } from "@/generated/prisma/client";
+import { Evaluation, PlayerProfile, CoachProfile, User } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { ITEM_PER_PAGE } from "@/lib/settings";
 import { currentUser } from "@clerk/nextjs/server"; 

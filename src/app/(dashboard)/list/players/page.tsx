@@ -6,7 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import FormModal from "@/components/FormModal";
 import prisma from "@/lib/prisma";
-import { PlayerProfile, Team, User } from "@/generated/prisma/client";
+import { PlayerProfile, Team, User } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { ITEM_PER_PAGE } from "@/lib/settings";
 import { Eye } from "lucide-react";

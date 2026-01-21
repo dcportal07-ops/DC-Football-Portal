@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import FormModal from "@/components/FormModal";
 import prisma from "@/lib/prisma";
-import { Team, Prisma } from "@/generated/prisma/client";
+import { Team, Prisma } from "@prisma/client";
 import { ITEM_PER_PAGE } from "@/lib/settings";
 import { Eye, SlidersHorizontal, ArrowUpDown } from "lucide-react";
 import { currentUser } from "@clerk/nextjs/server";

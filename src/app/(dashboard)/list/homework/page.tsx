@@ -244,7 +244,8 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import FormModal from "@/components/FormModal";
 import prisma from "@/lib/prisma";
-import { Assignment, CoachProfile, PlayerProfile, Prisma, User } from "@/generated/prisma/client";
+import { Assignment, CoachProfile, PlayerProfile, User, Prisma } 
+from "@prisma/client";
 import { ITEM_PER_PAGE } from "@/lib/settings";
 import { Eye, SlidersHorizontal, ArrowUpDown } from "lucide-react";
 import { currentUser } from "@clerk/nextjs/server";

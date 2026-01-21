@@ -1,15 +1,247 @@
 generator client {
   provider = "prisma-client"
-  // output   = "../src/generated/prisma"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
 }
 
-/**
- * ================= ENUMS =================
- */
+model User {
+  id                         String                    @id @default(uuid())
+  username                   String                    @unique
+  userCode                   String                    @unique
+  name                       String
+  email                      String                    @unique
+  phone                      String?
+  photo                      String?
+  role                       Role
+  createdAt                  DateTime                  @default(now())
+  updatedAt                  DateTime                  @updatedAt
+  coachProfile               CoachProfile?
+  conversationParticipations ConversationParticipant[]
+  importLogs                 ImportLog[]
+  messages                   Message[]
+  playerProfile              PlayerProfile?
+
+  @@index([role])
+}
+
+model CoachProfile {
+  id          String           @id @default(uuid())
+  userId      String           @unique
+  assignments Assignment[]
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specialties CoachSpecialty[]
+  teams       CoachTeam[]
+  evaluations Evaluation[]
+  flipCards   FlipCard[]
+}
+
+model PlayerProfile {
+  id           String       @id @default(uuid())
+  userId       String       @unique
+  dob          DateTime
+  gender       Gender
+  jerseyNumber Int?
+  parentEmail  String?
+  teamId       String?
+  address      String?
+  assignments  Assignment[]
+  evaluations  Evaluation[]
+  flipCards    FlipCard[]
+  team         Team?        @relation(fields: [teamId], references: [id])
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([teamId])
+}
+
+model Team {
+  id        String          @id @default(uuid())
+  code      String          @unique
+  name      String
+  ageGroup  String
+  createdAt DateTime        @default(now())
+  clubId    String?
+  coaches   CoachTeam[]
+  events    Event[]
+  players   PlayerProfile[]
+  club      Club?           @relation("ClubTeams", fields: [clubId], references: [id])
+}
+
+model Specialty {
+  id      String           @id @default(uuid())
+  name    String           @unique
+  coaches CoachSpecialty[]
+}
+
+model CoachSpecialty {
+  coachId     String
+  specialtyId String
+  coach       CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  specialty   Specialty    @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
+
+  @@id([coachId, specialtyId])
+}
+
+model CoachTeam {
+  coachId String
+  teamId  String
+  coach   CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  team    Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@id([coachId, teamId])
+}
+
+model Drill {
+  id             String   @id @default(uuid())
+  code           String   @unique
+  name           String
+  category       String
+  level          String
+  primarySkills  String[]
+  minAge         Int
+  maxAge         Int
+  description    String
+  regressionTip  String?
+  progressionTip String?
+  videoUrl       String?
+}
+
+model Evaluation {
+  id          String        @id @default(uuid())
+  date        DateTime      @default(now())
+  technical   Int           @default(0)
+  tactical    Int           @default(0)
+  physical    Int           @default(0)
+  mental      Int           @default(0)
+  attacking   Int           @default(0)
+  defending   Int           @default(0)
+  playerId    String
+  coachId     String
+  ratingsJson Json?
+  overallJson Json?
+  note        String?
+  createdAt   DateTime      @default(now())
+  coach       CoachProfile  @relation(fields: [coachId], references: [id])
+  player      PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([playerId])
+  @@index([coachId])
+}
+
+model Assignment {
+  id               String           @id @default(uuid())
+  playerId         String
+  coachId          String
+  createdAt        DateTime         @default(now())
+  template         String
+  skillFocus       String
+  currentRating    Int
+  goalRating       Int
+  drillItems       Json
+  coachFeedback    String?
+  estimatedTimeMin Int
+  status           AssignmentStatus
+  exportFormats    String[]
+  coach            CoachProfile     @relation(fields: [coachId], references: [id])
+  player           PlayerProfile    @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([playerId])
+  @@index([coachId])
+}
+
+model Event {
+  id        String   @id @default(uuid())
+  title     String
+  startTime DateTime
+  endTime   DateTime
+  teamId    String
+  createdAt DateTime @default(now())
+  team      Team     @relation(fields: [teamId], references: [id])
+}
+
+model Announcement {
+  id        String   @id @default(uuid())
+  title     String
+  audience  String
+  date      DateTime
+  createdAt DateTime @default(now())
+}
+
+model FlipCard {
+  id        String        @id @default(uuid())
+  title     String
+  content   Json
+  coachId   String
+  playerId  String
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  coach     CoachProfile  @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  player    PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([coachId])
+  @@index([playerId])
+}
+
+model Conversation {
+  id            String                    @id @default(uuid())
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+  lastMessageAt DateTime                  @default(now())
+  name          String?
+  isGroup       Boolean                   @default(false)
+  participants  ConversationParticipant[]
+  messages      Message[]
+}
+
+model ConversationParticipant {
+  id             String       @id @default(uuid())
+  conversationId String
+  userId         String
+  joinedAt       DateTime     @default(now())
+  lastReadAt     DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+}
+
+model Message {
+  id             String          @id @default(uuid())
+  createdAt      DateTime        @default(now())
+  content        String?
+  attachmentUrl  String?
+  attachmentType AttachmentType?
+  conversationId String
+  senderId       String
+  conversation   Conversation    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User            @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+}
+
+model Club {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  code      String   @unique
+  logo      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  teams     Team[]   @relation("ClubTeams")
+}
+
+model ImportLog {
+  id        String   @id @default(uuid())
+  action    String
+  filename  String?
+  status    String
+  rowCount  Int      @default(0)
+  errorMsg  String?
+  userId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
 
 enum Role {
   ADMIN
@@ -34,324 +266,4 @@ enum AttachmentType {
   VIDEO
   FILE
   AUDIO
-}
-
-/**
- * ================= USER =================
- */
-
-model User {
-  id       String  @id @default(uuid())
-  username String  @unique
-  userCode String  @unique
-  name     String
-  email    String  @unique
-  phone    String?
-  photo    String?
-  role     Role
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  coachProfile  CoachProfile?
-  playerProfile PlayerProfile?
-
-  conversationParticipations ConversationParticipant[]
-  messages                   Message[]
-
-  importLogs ImportLog[]
-  @@index([role])
-}
-
-/**
- * ================= COACH =================
- */
-
-model CoachProfile {
-  id     String @id @default(uuid())
-  userId String @unique
-
-  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  teams       CoachTeam[]
-  specialties CoachSpecialty[]
-  evaluations Evaluation[]
-  assignments Assignment[]
-
-  flipCards FlipCard[]
-}
-
-/**
- * ================= PLAYER =================
- */
-
-model PlayerProfile {
-  id           String       @id @default(uuid())
-  userId       String       @unique
-  dob          DateTime
-  gender       Gender
-  jerseyNumber Int?
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parentEmail  String?
-  teamId       String?
-  team         Team?        @relation(fields: [teamId], references: [id])
-  address      String?
-  evaluations  Evaluation[]
-  assignments  Assignment[]
-  flipCards    FlipCard[] // ✅ ADD
-
-  @@index([teamId])
-}
-
-/**
- * ================= TEAM =================
- */
-
-model Team {
-  id        String   @id @default(uuid())
-  code      String   @unique
-  name      String
-  ageGroup  String
-  createdAt DateTime @default(now())
-
-  events  Event[]
-  clubId    String?
-  club      Club?    @relation("ClubTeams", fields: [clubId], references: [id], onDelete: SetNull)
-  coaches   CoachTeam[]
-  players   PlayerProfile[]
-}
-
-/**
- * ================= SPECIALTY ==============
- */
-
-model Specialty {
-  id   String @id @default(uuid())
-  name String @unique
-
-  coaches CoachSpecialty[]
-}
-
-/**
- * ================= JOIN TABLES ============
- */
-
-model CoachSpecialty {
-  coachId     String
-  specialtyId String
-
-  coach     CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
-  specialty Specialty    @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
-
-  @@id([coachId, specialtyId])
-}
-
-model CoachTeam {
-  coachId String
-  teamId  String
-
-  coach CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
-  team  Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
-
-  @@id([coachId, teamId])
-}
-
-/**
- * ================= DRILL =================
- */
-
-model Drill {
-  id             String   @id @default(uuid())
-  code           String   @unique
-  name           String
-  category       String
-  level          String
-  primarySkills  String[]
-  minAge         Int
-  maxAge         Int
-  description    String
-  regressionTip  String?
-  progressionTip String?
-  videoUrl       String?
-}
-
-/**
- * ================= EVALUATION =============
- */
-
-// ... existing models
-
-model Evaluation {
-  id   String   @id @default(uuid())
-  date DateTime @default(now())
-
-  // 🔥 ADD THESE FIELDS (Ratings 0-100)
-  technical Int @default(0)
-  tactical  Int @default(0)
-  physical  Int @default(0)
-  mental    Int @default(0)
-  attacking Int @default(0)
-  defending Int @default(0)
-
-  // RELATIONS
-  playerId String
-  player   PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
-
-  coachId String
-  coach   CoachProfile @relation(fields: [coachId], references: [id])
-
-  // Keep existing JSON fields if you use them for other things, 
-  // but for the chart, the specific Int fields above are better.
-  ratingsJson Json?
-  overallJson Json?
-  note        String?
-
-  createdAt DateTime @default(now())
-
-  @@index([playerId])
-  @@index([coachId])
-}
-
-/**
- * ================= ASSIGNMENT ==============
- */
-
-model Assignment {
-  id        String   @id @default(uuid())
-  playerId  String
-  coachId   String
-  createdAt DateTime @default(now())
-
-  template      String
-  skillFocus    String
-  currentRating Int
-  goalRating    Int
-
-  drillItems       Json
-  coachFeedback    String?
-  estimatedTimeMin Int
-  status           AssignmentStatus
-  exportFormats    String[]
-
-  player PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
-  coach  CoachProfile  @relation(fields: [coachId], references: [id])
-
-  @@index([playerId])
-  @@index([coachId])
-}
-
-/**
- * ================= EVENTS =================
- */
-
-model Event {
-  id        String   @id @default(uuid())
-  title     String
-  startTime DateTime
-  endTime   DateTime
-
-  teamId String
-  team   Team   @relation(fields: [teamId], references: [id])
-
-  createdAt DateTime @default(now())
-}
-
-/**
- * ================= ANNOUNCEMENTS ==========
- */
-
-model Announcement {
-  id       String   @id @default(uuid())
-  title    String
-  audience String
-  date     DateTime
-
-  createdAt DateTime @default(now())
-}
-
-model FlipCard {
-  id String @id @default(uuid())
-
-  // BASIC INFO
-  title   String
-  content Json // 🔥 store full flipcard data (charts, notes, drills)
-
-  // RELATIONS
-  coachId  String
-  playerId String
-
-  coach  CoachProfile  @relation(fields: [coachId], references: [id], onDelete: Cascade)
-  player PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([coachId])
-  @@index([playerId])
-}
-
-model Conversation {
-  id            String   @id @default(uuid())
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  lastMessageAt DateTime @default(now()) // Crucial for sorting chat list
-  name          String?  // Optional: for Group Chat names
-  isGroup       Boolean  @default(false)
-
-  participants  ConversationParticipant[]
-  messages      Message[]
-}
-
-model ConversationParticipant {
-  id             String   @id @default(uuid())
-  conversationId String
-  userId         String
-  joinedAt       DateTime @default(now())
-  lastReadAt     DateTime @default(now()) // 🔥 This allows "Unread" badges
-
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([conversationId, userId])
-}
-
-
-model Message {
-  id             String          @id @default(uuid())
-  createdAt      DateTime        @default(now())
-  content        String?         // Text content (nullable if sending just an image)
-  
-  attachmentUrl  String?
-  attachmentType AttachmentType? // IMAGE, VIDEO, FILE, AUDIO
-
-  conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-
-  senderId       String
-  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
-
-  @@index([conversationId])
-}
-
-model Club {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  code      String   @unique
-  logo      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  teams     Team[]   @relation("ClubTeams")
-}
-
-model ImportLog {
-  id        String   @id @default(uuid())
-  action    String   // e.g. "Import Players"
-  filename  String?  // e.g. "players_data.xlsx"
-  status    String   // "SUCCESS" | "FAILED"
-  rowCount  Int      @default(0)
-  errorMsg  String?  
-  
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
 }

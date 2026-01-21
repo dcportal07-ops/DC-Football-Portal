@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
 import { sendNotification } from "@/lib/automation";
-import { Role, Gender } from "@/generated/prisma/enums";
+import { Role, Gender } from "../generated/prisma/enums";
 
 interface CreatePlayerInput {
   name: string;

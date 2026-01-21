@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { Gender,Role } from "@/generated/prisma/enums";
+// import { Gender,Role } from "@/generated/prisma/enums";
+import {Gender, Role } from '@prisma/client'
 import { currentUser } from "@clerk/nextjs/server";
 
 export async function POST(req: Request) {

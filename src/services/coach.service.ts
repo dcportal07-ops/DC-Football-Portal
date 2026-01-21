@@ -1,7 +1,8 @@
 import prisma from "@/lib/prisma";
 import { sendNotification } from "@/lib/automation";
 import bcrypt from "bcryptjs";
-import { Role } from "@/generated/prisma/enums";
+// import { Role } from "@/generated/prisma/enums";
+import { Role } from '@prisma/client'
 
 interface CreateCoachInput {
   name: string;

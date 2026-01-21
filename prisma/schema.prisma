@@ -3,10 +3,10 @@ generator client {
   output   = "../src/generated/prisma"
 }
 
-generator enums {
-  provider = "prisma-generator-enums"
-  output   = "../src/generated/prisma/enums"   
-}
+// generator enums {
+//   provider = "prisma-generator-enums"
+//   output   = "../src/generated/prisma/enums"   
+// }
 
 datasource db {
   provider = "postgresql"

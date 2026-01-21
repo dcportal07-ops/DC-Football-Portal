@@ -4,7 +4,8 @@ import TableSearch from "@/components/TableSearch";
 import { Button } from "@/components/ui/button";
 import FormModal from "@/components/FormModal";
 import prisma from "@/lib/prisma";
-import { Announcement, Prisma } from "@/generated/prisma/client";
+// import { Announcement, Prisma } from "@/generated/prisma/client";
+import { Announcement, Prisma } from "@prisma/client";
 import { ITEM_PER_PAGE } from "@/lib/settings";
 import { SlidersHorizontal, ArrowUpDown } from "lucide-react";
 // 1. Import Clerk's server-side user helper

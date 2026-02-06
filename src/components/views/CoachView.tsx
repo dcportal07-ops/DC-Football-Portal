@@ -26,16 +26,17 @@ const CoachView = async ({ coachId }: { coachId: string }) => {
             include: {
               _count: { select: { players: true } },
               events: {
-                 where: { startTime: { gte: new Date() } },
-                 take: 3,
-                 orderBy: { startTime: 'asc' }
+                where: { startTime: { gte: new Date() } },
+                take: 3,
+                orderBy: { startTime: 'asc' }
               },
               players: { select: { gender: true } }
             }
           }
         }
       },
-      evaluations: true 
+      evaluations: true,
+      specialties: { include: { specialty: true } } // 🔥 Include Specialties
     },
   });
 
@@ -48,10 +49,10 @@ const CoachView = async ({ coachId }: { coachId: string }) => {
   let boysCount = 0;
   let girlsCount = 0;
   coach.teams.forEach(t => {
-      t.team.players.forEach(p => {
-          if (p.gender === 'M') boysCount++;
-          else if (p.gender === 'F') girlsCount++;
-      });
+    t.team.players.forEach(p => {
+      if (p.gender === 'M') boysCount++;
+      else if (p.gender === 'F') girlsCount++;
+    });
   });
 
   const demographicsData = [
@@ -63,15 +64,15 @@ const CoachView = async ({ coachId }: { coachId: string }) => {
   let evalCount = coach.evaluations.length;
 
   if (evalCount > 0) {
-      coach.evaluations.forEach(ev => {
-          const ratings = ev.ratingsJson as any; 
-          skillsTotal.Technical += Number(ratings?.technical) || 0;
-          skillsTotal.Tactical += Number(ratings?.tactical) || 0;
-          skillsTotal.Physical += Number(ratings?.physical) || 0;
-          skillsTotal.Mental += Number(ratings?.mental) || 0;
-          skillsTotal.Teamwork += Number(ratings?.teamwork) || 0;
-          skillsTotal.Discipline += Number(ratings?.discipline) || 0;
-      });
+    coach.evaluations.forEach(ev => {
+      const ratings = ev.ratingsJson as any;
+      skillsTotal.Technical += Number(ratings?.technical) || 0;
+      skillsTotal.Tactical += Number(ratings?.tactical) || 0;
+      skillsTotal.Physical += Number(ratings?.physical) || 0;
+      skillsTotal.Mental += Number(ratings?.mental) || 0;
+      skillsTotal.Teamwork += Number(ratings?.teamwork) || 0;
+      skillsTotal.Discipline += Number(ratings?.discipline) || 0;
+    });
   }
 
   const skillsData = [
@@ -94,7 +95,7 @@ const CoachView = async ({ coachId }: { coachId: string }) => {
 
   const totalPlayers = coach.teams.reduce((sum, t) => sum + t.team._count.players, 0);
   const totalSessions = coach.teams.reduce((sum, t) => sum + t.team.events.length, 0);
-  
+
   const upcomingEvents = coach.teams
     .flatMap(t => t.team.events.map(evt => ({ ...evt, teamName: t.team.name })))
     .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
@@ -114,10 +115,10 @@ const CoachView = async ({ coachId }: { coachId: string }) => {
                 <div className="flex flex-col sm:flex-row items-center gap-2 mb-2">
                   <h1 className="text-xl font-bold text-slate-800">{coach.user.name}</h1>
                   {canEdit && (
-                    <FormModal 
-                        table="coaches" 
-                        type="update" 
-                        data={{
+                    <FormModal
+                      table="coaches"
+                      type="update"
+                      data={{
                         id: coach.id,
                         username: coach.user.userCode,
                         name: coach.user.name,
@@ -125,7 +126,8 @@ const CoachView = async ({ coachId }: { coachId: string }) => {
                         phone: coach.user.phone || "",
                         img: coach.user.photo,
                         teams: coach.teams.map((t) => t.team.id),
-                        }} 
+                        specialties: coach.specialties.map(s => s.specialty.name).join(", "), // 🔥 Pass flattened specialties
+                      }}
                     />
                   )}
                 </div>
@@ -139,18 +141,18 @@ const CoachView = async ({ coachId }: { coachId: string }) => {
           </div>
           {/* KPI CARDS */}
           <div className="flex-1 grid grid-cols-2 lg:grid-cols-3 gap-4">
-             <div className="bg-white p-4 rounded-md flex flex-col justify-center shadow-sm border border-gray-100">
-               <h1 className="text-2xl font-bold text-[#006D77]">{totalPlayers}</h1>
-               <span className="text-sm text-gray-400 font-medium">Players</span>
-             </div>
-             <div className="bg-white p-4 rounded-md flex flex-col justify-center shadow-sm border border-gray-100">
-               <h1 className="text-2xl font-bold text-[#F97316]">{coach.teams.length}</h1>
-               <span className="text-sm text-gray-400 font-medium">Teams</span>
-             </div>
-             <div className="bg-white p-4 rounded-md flex flex-col justify-center shadow-sm border border-gray-100">
-               <h1 className="text-2xl font-bold text-[#006D77]">{totalSessions}</h1>
-               <span className="text-sm text-gray-400 font-medium">Sessions</span>
-             </div>
+            <div className="bg-white p-4 rounded-md flex flex-col justify-center shadow-sm border border-gray-100">
+              <h1 className="text-2xl font-bold text-[#006D77]">{totalPlayers}</h1>
+              <span className="text-sm text-gray-400 font-medium">Players</span>
+            </div>
+            <div className="bg-white p-4 rounded-md flex flex-col justify-center shadow-sm border border-gray-100">
+              <h1 className="text-2xl font-bold text-[#F97316]">{coach.teams.length}</h1>
+              <span className="text-sm text-gray-400 font-medium">Teams</span>
+            </div>
+            <div className="bg-white p-4 rounded-md flex flex-col justify-center shadow-sm border border-gray-100">
+              <h1 className="text-2xl font-bold text-[#006D77]">{totalSessions}</h1>
+              <span className="text-sm text-gray-400 font-medium">Sessions</span>
+            </div>
           </div>
         </div>
         <CoachMiddleCharts skillsData={skillsData} performanceData={performanceData} />

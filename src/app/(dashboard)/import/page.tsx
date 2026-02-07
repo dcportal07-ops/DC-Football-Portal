@@ -15,7 +15,7 @@ export default function ImportPage() {
         name: "Rohit Sharma",
         email: "rohit@example.com",
         phone: "9876543210",
-        gender: "M", 
+        gender: "M",
         dob: "2006-05-12",
         jerseyNumber: 45,
         address: "Mumbai",
@@ -38,19 +38,19 @@ export default function ImportPage() {
     XLSX.utils.book_append_sheet(workbook, worksheet, "Players");
 
     if (format === 'xlsx') {
-        const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-        const data = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        saveAs(data, 'player_import_template.xlsx');
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const data = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(data, 'player_import_template.xlsx');
     } else {
-        const csvOutput = XLSX.utils.sheet_to_csv(worksheet);
-        const data = new Blob([csvOutput], { type: 'text/csv;charset=utf-8' });
-        saveAs(data, 'player_import_template.csv');
+      const csvOutput = XLSX.utils.sheet_to_csv(worksheet);
+      const data = new Blob([csvOutput], { type: 'text/csv;charset=utf-8' });
+      saveAs(data, 'player_import_template.csv');
     }
   };
 
   const handleImport = async () => {
     if (!file) return alert("Please select a file first!");
-    
+
     setLoading(true); // 🔥 LOADER START
 
     const reader = new FileReader();
@@ -62,19 +62,19 @@ export default function ImportPage() {
         const sheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(sheet);
 
-       const response = await fetch('/api/player/import', {
+        const response = await fetch('/api/player/import', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-              players: jsonData, 
-              fileName: file.name // ✅ Ye add kar diya hai
-          }), 
+          body: JSON.stringify({
+            players: jsonData,
+            fileName: file.name // ✅ Ye add kar diya hai
+          }),
         });
         const result = await response.json();
 
         if (response.ok) {
           alert("🎉 Success! Players added.");
-          router.push('/list/player');
+          router.push('/list/players');
         } else {
           alert(`Error: ${result.message}`);
         }
@@ -90,7 +90,7 @@ export default function ImportPage() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] bg-gray-50/50 p-4">
-      
+
       {/* 🔥🔥🔥 FULL SCREEN LOADER OVERLAY 🔥🔥🔥 */}
       {loading && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center backdrop-blur-sm">
@@ -135,8 +135,8 @@ export default function ImportPage() {
             <div className="flex flex-col items-center justify-center pt-5 pb-6">
               {file ? (
                 <div className="text-center">
-                   <p className="text-green-600 font-bold mb-1">File Selected!</p>
-                   <p className="text-sm text-gray-500">{file.name}</p>
+                  <p className="text-green-600 font-bold mb-1">File Selected!</p>
+                  <p className="text-sm text-gray-500">{file.name}</p>
                 </div>
               ) : (
                 <>

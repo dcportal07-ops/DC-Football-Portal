@@ -100,20 +100,25 @@ export async function POST(req: Request) {
           const username = `player_${Math.floor(Math.random() * 1000000)}`;
 
           // --- A. Create User in Clerk ---
-          // PASSWORD: Default password set karne ka logic
           const email = p.email;
           if (!email) throw new Error(`Email is required for player ${p.name}`);
 
-          console.log(`🟢 Creating Clerk User: ${email}`);
-          const clerkUser = await client.users.createUser({
-            emailAddress: [email],
-            password: "Player@123", // 🔐 DEFAULT PASSWORD
-            firstName: p.name?.split(" ")[0] || "Player",
-            lastName: p.name?.split(" ").slice(1).join(" ") || "",
-            username: username,
-            publicMetadata: { role: "player" }
-          });
-          console.log(`✅ Clerk User Created: ${clerkUser.id}`);
+          let clerkUser;
+          try {
+            console.log(`🟢 Creating Clerk User: ${email}`);
+            clerkUser = await client.users.createUser({
+              emailAddress: [email],
+              password: "Player@123", // 🔐 DEFAULT PASSWORD
+              firstName: p.name?.split(" ")[0] || "Player",
+              lastName: p.name?.split(" ").slice(1).join(" ") || "",
+              username: username,
+              publicMetadata: { role: "player" }
+            });
+            console.log(`✅ Clerk User Created: ${clerkUser.id}`);
+          } catch (clerkError: any) {
+            console.error(`❌ Clerk Creation Failed for ${email}:`, clerkError);
+            throw new Error(`Clerk Error: ${clerkError.errors?.[0]?.message || clerkError.message}`);
+          }
 
           // --- B. Create User in Database (Synced with Clerk ID) ---
           const newItem = await prisma.user.create({

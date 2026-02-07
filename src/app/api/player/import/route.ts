@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-// import { Gender,Role } from "@/generated/prisma/enums";
-import {Gender, Role } from '@prisma/client'
-import { currentUser } from "@clerk/nextjs/server";
+import { Gender, Role } from '@prisma/client'
+import { currentUser, clerkClient } from "@clerk/nextjs/server";
 
 export async function POST(req: Request) {
   // 1. Auth Check (Clerk)
   const user = await currentUser();
-  
+
   if (!user) {
     return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   }
@@ -16,21 +15,21 @@ export async function POST(req: Request) {
   const adminUsername = user.username;
 
   if (!adminUsername) {
-    return NextResponse.json({ 
-      success: false, 
-      message: "No username found on your account. Please set a username in Clerk." 
+    return NextResponse.json({
+      success: false,
+      message: "No username found on your account. Please set a username in Clerk."
     }, { status: 400 });
   }
 
   // 2. Find OR Create Admin in Database (Auto-Sync Logic) 🛠️
-  let dbUser = await prisma.user.findUnique({ 
-    where: { username: adminUsername } 
+  let dbUser = await prisma.user.findUnique({
+    where: { username: adminUsername }
   });
-  
+
   // Agar user nahi mila, toh turant bana do!
   if (!dbUser) {
     console.log(`User '${adminUsername}' not found in DB. Creating now...`);
-    
+
     try {
       dbUser = await prisma.user.create({
         data: {
@@ -48,13 +47,13 @@ export async function POST(req: Request) {
     }
   }
 
-  let filename = "unknown_file.xlsx"; 
+  let filename = "unknown_file.xlsx";
 
   try {
     // 3. Process Excel Data
     const body = await req.json();
-    const { players, fileName: fName } = body; 
-    
+    const { players, fileName: fName } = body;
+
     if (fName) filename = fName;
 
     if (!players || !Array.isArray(players) || players.length === 0) {
@@ -71,27 +70,49 @@ export async function POST(req: Request) {
 
     const teamMap = new Map(teams.map(t => [t.code, t.id]));
 
-    // 5. Bulk Create Players
-    await prisma.$transaction(
-      players.map((p: any) => {
+    // 5. Bulk Create Players (Clerk + DB)
+    const client = await clerkClient()
+    const results = [];
+    const errors = [];
+
+    for (const p of players) {
+      try {
         const userCode = `PL-${Math.floor(100000 + Math.random() * 900000)}`;
-        
         let genderEnum: Gender = "M";
+
         const g = p.gender?.toString().toUpperCase();
         if (g === "F" || g === "FEMALE") genderEnum = "F";
         else if (g === "OTHER") genderEnum = "OTHER";
 
-        const dobDate = new Date(p.dob); 
+        const dobDate = new Date(p.dob);
         const validDob = isNaN(dobDate.getTime()) ? new Date() : dobDate;
-
         const teamId = p.teamCode ? teamMap.get(p.teamCode) : null;
 
-        return prisma.user.create({
+        // Generate a unique username if not provided or valid
+        const username = `player_${Math.floor(Math.random() * 1000000)}`;
+
+        // --- A. Create User in Clerk ---
+        // PASSWORD: Default password set karne ka logic
+        const email = p.email;
+        if (!email) throw new Error(`Email is required for player ${p.name}`);
+
+        const clerkUser = await client.users.createUser({
+          emailAddress: [email],
+          password: "Player@123", // 🔐 DEFAULT PASSWORD
+          firstName: p.name?.split(" ")[0] || "Player",
+          lastName: p.name?.split(" ").slice(1).join(" ") || "",
+          username: username,
+          publicMetadata: { role: "player" }
+        });
+
+        // --- B. Create User in Database (Synced with Clerk ID) ---
+        const newItem = await prisma.user.create({
           data: {
+            id: clerkUser.id, // 🔗 SYNC ID WITH CLERK
             userCode: userCode,
-            username: `player_${Math.floor(Math.random() * 1000000)}`, // Unique username for player
+            username: username,
             name: p.name || "Unknown Player",
-            email: p.email, 
+            email: email,
             phone: p.phone ? String(p.phone) : null,
             role: Role.PLAYER,
             playerProfile: {
@@ -105,43 +126,39 @@ export async function POST(req: Request) {
             }
           }
         });
-      })
-    );
 
-    // 6. Log Success
-    if (dbUser) {
-        await prisma.importLog.create({
-            data: {
-                action: "Import Players",
-                filename: filename,
-                status: "SUCCESS",
-                rowCount: players.length,
-                userId: dbUser.id
-            }
-        });
+        results.push(newItem);
+
+      } catch (err: any) {
+        console.error(`Failed to import player ${p.name}:`, err);
+        errors.push({ name: p.name, error: err.message || "Unknown error" });
+      }
     }
 
-    return NextResponse.json({ success: true, message: `Imported ${players.length} players!` });
+    // 6. Log Import Result
+    const status = errors.length === 0 ? "SUCCESS" : (results.length > 0 ? "PARTIAL_SUCCESS" : "FAILED");
+
+    if (dbUser) {
+      await prisma.importLog.create({
+        data: {
+          action: "Import Players",
+          filename: filename,
+          status: status,
+          rowCount: results.length,
+          errorMsg: errors.length > 0 ? JSON.stringify(errors) : null,
+          userId: dbUser.id
+        }
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Imported ${results.length} players. Failed: ${errors.length}`,
+      errors: errors
+    });
 
   } catch (error: any) {
-    console.error("Import Error:", error);
-
-    if (dbUser?.id) {
-        await prisma.importLog.create({
-        data: {
-            action: "Import Players",
-            filename: filename,
-            status: "FAILED",
-            rowCount: 0,
-            errorMsg: error.message || "Unknown Error",
-            userId: dbUser.id
-        }
-        });
-    }
-
-    if (error.code === 'P2002') {
-      return NextResponse.json({ success: false, message: "Import Failed: Duplicate data found (Email/Username)." }, { status: 409 });
-    }
-    return NextResponse.json({ success: false, message: "Server Error" }, { status: 500 });
+    console.error("Global Import Error:", error);
+    return NextResponse.json({ success: false, message: "Server Error: " + error.message }, { status: 500 });
   }
 }

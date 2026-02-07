@@ -26,6 +26,7 @@ model User {
   phone                      String?
   photo                      String?
   role                       Role
+  forcePasswordReset         Boolean                   @default(false)
   createdAt                  DateTime                  @default(now())
   updatedAt                  DateTime                  @updatedAt
   coachProfile               CoachProfile?

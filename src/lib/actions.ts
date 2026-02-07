@@ -8,6 +8,44 @@ import { getDrillById, MASTER_DRILLS } from "@/lib/drills";
 import { z } from "zod";
 import { sendNotification } from "./automation";
 
+// ==========================================
+// PASSWORD RESET ACTION (Forced Flow)
+// ==========================================
+export const changePassword = async (newPassword: string) => {
+  try {
+    const user = await currentUser();
+    if (!user) return { success: false, message: "Unauthorized" };
+
+    // 1. Password Strength Validation (Basic)
+    if (newPassword.length < 8) {
+      return { success: false, message: "Password must be at least 8 characters long." };
+    }
+
+    // 2. Update Password in Clerk
+    const client = await clerkClient();
+    try {
+      await client.users.updateUser(user.id, {
+        password: newPassword
+      });
+    } catch (err: any) {
+      console.error("Clerk Password Update Error:", err);
+      return { success: false, message: err.errors?.[0]?.message || "Failed to update password." };
+    }
+
+    // 3. Update 'forcePasswordReset' in Database
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { forcePasswordReset: false }
+    });
+
+    return { success: true, message: "Password updated successfully!" };
+
+  } catch (err) {
+    console.error("Change Password Error:", err);
+    return { success: false, message: "Server Error" };
+  }
+};
+
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 async function ensureAdmin() {

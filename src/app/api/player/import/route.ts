@@ -108,7 +108,7 @@ export async function POST(req: Request) {
             console.log(`🟢 Creating Clerk User: ${email}`);
             clerkUser = await client.users.createUser({
               emailAddress: [email],
-              password: "Player@123", // 🔐 DEFAULT PASSWORD
+              password: "dcPl@yer00", // 🔐 DEFAULT PASSWORD
               firstName: p.name?.split(" ")[0] || "Player",
               lastName: p.name?.split(" ").slice(1).join(" ") || "",
               username: username,
@@ -130,6 +130,7 @@ export async function POST(req: Request) {
               email: email,
               phone: p.phone ? String(p.phone) : null,
               role: Role.PLAYER,
+              forcePasswordReset: true,
               playerProfile: {
                 create: {
                   dob: validDob,

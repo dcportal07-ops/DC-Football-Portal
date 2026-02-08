@@ -84,6 +84,8 @@ export async function POST(req: Request) {
       const errors = [];
 
       for (const p of players) {
+        let clerkUser: any = null; // 🟢 Defined outside try block for rollback access
+
         try {
           const userCode = `PL-${Math.floor(100000 + Math.random() * 900000)}`;
           let genderEnum: Gender = "M";
@@ -103,7 +105,6 @@ export async function POST(req: Request) {
           const email = p.email;
           if (!email) throw new Error(`Email is required for player ${p.name}`);
 
-          let clerkUser;
           try {
             console.log(`🟢 Creating Clerk User: ${email}`);
             clerkUser = await client.users.createUser({
@@ -147,6 +148,17 @@ export async function POST(req: Request) {
 
         } catch (err: any) {
           console.error(`❌ Failed to import player ${p.name}:`, err);
+
+          // 🛑 ROLLBACK: Delete Clerk user if DB creation failed
+          if (clerkUser) {
+            try {
+              console.log(`⚠️ Rolling back Clerk user: ${clerkUser.id}`);
+              await client.users.deleteUser(clerkUser.id);
+            } catch (rollbackErr) {
+              console.error("❌ Critical: Failed to rollback Clerk user:", rollbackErr);
+            }
+          }
+
           errors.push({ name: p.name, error: err.message || "Unknown error" });
         }
       }

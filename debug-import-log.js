@@ -1,0 +1,34 @@
+
+const { PrismaClient } = require('@prisma/client');
+
+const prisma = new PrismaClient();
+
+async function main() {
+    try {
+        const log = await prisma.importLog.findFirst({
+            orderBy: { createdAt: 'desc' },
+        });
+
+        if (log) {
+            console.log('Latest Import Log:');
+            console.log(JSON.stringify(log, null, 2));
+            if (log.errorMsg) {
+                console.log('Error Details:');
+                try {
+                    const errors = JSON.parse(log.errorMsg);
+                    console.log(JSON.stringify(errors, null, 2));
+                } catch (e) {
+                    console.log("Could not parse errorMsg JSON:", log.errorMsg);
+                }
+            }
+        } else {
+            console.log('No import logs found.');
+        }
+    } catch (e) {
+        console.error("Error querying database:", e);
+    } finally {
+        await prisma.$disconnect();
+    }
+}
+
+main();

@@ -4,32 +4,43 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-    const log = await prisma.importLog.findFirst({
-        orderBy: { createdAt: 'desc' },
-    });
+    console.log("Fetching latest import log...");
+    try {
+        const log = await prisma.importLog.findFirst({
+            orderBy: { createdAt: 'desc' },
+            include: { user: true }
+        });
 
-    if (log) {
-        console.log('Latest Import Log:');
-        console.log(JSON.stringify(log, null, 2));
-        if (log.errorMsg) {
-            console.log('Error Details:');
-            try {
-                const errors = JSON.parse(log.errorMsg);
-                console.log(JSON.stringify(errors, null, 2));
-            } catch (e) {
-                console.log("Could not parse errorMsg JSON:", log.errorMsg);
+        if (log) {
+            console.log('--- LATEST IMPORT LOG ---');
+            console.log(`ID: ${log.id}`);
+            console.log(`Status: ${log.status}`);
+            console.log(`Action: ${log.action}`);
+            console.log(`Filename: ${log.filename}`);
+            console.log(`Row Count: ${log.rowCount}`);
+            console.log(`User: ${log.user?.username || 'Unknown'}`);
+            console.log(`Created At: ${log.createdAt}`);
+
+            if (log.errorMsg) {
+                console.log('--- ERROR MESSAGE ---');
+                try {
+                    // Keep it as string if it's not valid JSON, otherwise pretty print
+                    const parsed = JSON.parse(log.errorMsg);
+                    console.log(JSON.stringify(parsed, null, 2));
+                } catch (e) {
+                    console.log(log.errorMsg);
+                }
+            } else {
+                console.log('No error message recorded.');
             }
+        } else {
+            console.log('No import logs found in the database.');
         }
-    } else {
-        console.log('No import logs found.');
+    } catch (error) {
+        console.error("Error fetching logs:", error);
+    } finally {
+        await prisma.$disconnect();
     }
 }
 
-main()
-    .catch((e) => {
-        console.error(e);
-        process.exit(1);
-    })
-    .finally(async () => {
-        await prisma.$disconnect();
-    });
+main();

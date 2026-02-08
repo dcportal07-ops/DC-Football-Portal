@@ -5,31 +5,31 @@ const { PrismaPg } = require('@prisma/adapter-pg');
 const { PrismaClient } = require('@prisma/client');
 
 const connectionString = process.env.DATABASE_URL;
-
-console.log("Connecting to DB...");
 const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-    console.log("Fetching latest import log...");
     try {
-        const log = await prisma.importLog.findFirst({
+        const user = await prisma.user.findFirst({
             orderBy: { createdAt: 'desc' },
-            include: { user: true }
+            where: { role: 'PLAYER' },
+            select: {
+                username: true,
+                forcePasswordReset: true,
+                createdAt: true
+            }
         });
 
-        if (log) {
-            console.log('--- LATEST IMPORT LOG ---');
-            console.log(`ID: ${log.id}`);
-            console.log(`Status: ${log.status}`);
-            console.log(`Action: ${log.action}`);
-            console.log(`ErrorMsg: ${log.errorMsg}`);
+        if (user) {
+            console.log(`User: ${user.username}`);
+            console.log(`ForceReset: ${user.forcePasswordReset}`);
+            console.log(`Time: ${user.createdAt}`);
         } else {
-            console.log('No import logs found.');
+            console.log('No player found.');
         }
     } catch (error) {
-        console.error("Error:", error);
+        console.log("Error:", error.message);
     } finally {
         await prisma.$disconnect();
     }

@@ -73,7 +73,7 @@ export default function ImportPage() {
         const result = await response.json();
 
         if (response.ok) {
-          alert("🎉 Success! Players added.");
+          alert(`🎉 ${result.message}`);
           router.push('/list/players');
         } else {
           alert(`Error: ${result.message}`);

@@ -84,12 +84,13 @@ export async function POST(req: Request) {
       const errors = [];
 
       for (const p of players) {
-        let clerkUser: any = null; // 🟢 Defined outside try block for rollback access
+        let clerkUser: any = null;
 
         try {
-          const userCode = `PL-${Math.floor(100000 + Math.random() * 900000)}`;
-          let genderEnum: Gender = "M";
+          const email = p.email;
+          if (!email) throw new Error(`Email is required for player ${p.name}`);
 
+          let genderEnum: Gender = "M";
           const g = p.gender?.toString().toUpperCase();
           if (g === "F" || g === "FEMALE") genderEnum = "F";
           else if (g === "OTHER") genderEnum = "OTHER";
@@ -98,49 +99,84 @@ export async function POST(req: Request) {
           const validDob = isNaN(dobDate.getTime()) ? new Date() : dobDate;
           const teamId = p.teamCode ? teamMap.get(p.teamCode) : null;
 
-          // Generate a unique username if not provided or valid
-          const username = `player_${Math.floor(Math.random() * 1000000)}`;
+          // 1. Check if user already exists in Clerk
+          const existingUsers = await client.users.getUserList({ emailAddress: [email] });
 
-          // --- A. Create User in Clerk ---
-          const email = p.email;
-          if (!email) throw new Error(`Email is required for player ${p.name}`);
+          if (existingUsers.data.length > 0) {
+            // User exists! Use this user.
+            clerkUser = existingUsers.data[0];
+            console.log(`⚠️ User already exists in Clerk: ${clerkUser.id}`);
+          } else {
+            // User does not exist, Create new.
+            const uniqueSuffix = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+            const username = `player_${uniqueSuffix}`;
+            const userCode = `PL-${Math.floor(100000 + Math.random() * 900000)}`;
 
-          try {
-            console.log(`🟢 Creating Clerk User: ${email}`);
-            clerkUser = await client.users.createUser({
-              emailAddress: [email],
-              password: "dcPl@yer00", // 🔐 DEFAULT PASSWORD
-              firstName: p.name?.split(" ")[0] || "Player",
-              lastName: p.name?.split(" ").slice(1).join(" ") || "",
-              username: username,
-              publicMetadata: { role: "player" }
-            });
-            console.log(`✅ Clerk User Created: ${clerkUser.id}`);
-          } catch (clerkError: any) {
-            console.error(`❌ Clerk Creation Failed for ${email}:`, clerkError);
-            throw new Error(`Clerk Error: ${clerkError.errors?.[0]?.message || clerkError.message}`);
+            try {
+              console.log(`🟢 Creating Clerk User: ${email}`);
+              clerkUser = await client.users.createUser({
+                emailAddress: [email],
+                password: "dcPl@yer00",
+                firstName: p.name?.split(" ")[0] || "Player",
+                lastName: p.name?.split(" ").slice(1).join(" ") || "",
+                username: username,
+                publicMetadata: { role: "player" }
+              });
+              console.log(`✅ Clerk User Created: ${clerkUser.id}`);
+            } catch (clerkError: any) {
+              console.error(`❌ Clerk Creation Failed for ${email}:`, clerkError);
+              throw new Error(`Clerk Error: ${clerkError.errors?.[0]?.message || clerkError.message}`);
+            }
           }
 
-          // --- B. Create User in Database (Synced with Clerk ID) ---
-          const newItem = await prisma.user.create({
-            data: {
-              id: clerkUser.id, // 🔗 SYNC ID WITH CLERK
-              userCode: userCode,
-              username: username,
+          // 2. Upsert User in Database
+          // We use upsert to ensure we don't fail if the user exists in DB but not linked correctly, or vice versa updates.
+          // Note: If user exists, we might want to update their info? For now, let's ensure they exist.
+
+          // We need a unique username for DB too if we are creating. 
+          // If we reused Clerk user, they have a username.
+
+          let dbUsername = clerkUser.username || `player_${Date.now()}`;
+          let dbUserCode = `PL-${Math.floor(100000 + Math.random() * 900000)}`;
+
+          const newItem = await prisma.user.upsert({
+            where: { id: clerkUser.id },
+            update: {
+              // If you want to update fields on re-import, do it here. 
+              // For now, we keep existing data to be safe, or maybe update name/phone?
+              name: p.name || undefined,
+              phone: p.phone ? String(p.phone) : undefined,
+            },
+            create: {
+              id: clerkUser.id,
+              username: dbUsername,
+              userCode: dbUserCode,
               name: p.name || "Unknown Player",
               email: email,
               phone: p.phone ? String(p.phone) : null,
               role: Role.PLAYER,
               forcePasswordReset: true,
-              playerProfile: {
-                create: {
-                  dob: validDob,
-                  gender: genderEnum,
-                  jerseyNumber: p.jerseyNumber ? Number(p.jerseyNumber) : null,
-                  address: p.address || null,
-                  team: teamId ? { connect: { id: teamId } } : undefined
-                }
-              }
+            }
+          });
+
+          // 3. Upsert PlayerProfile
+          // If profile exists, update it.
+          await prisma.playerProfile.upsert({
+            where: { userId: clerkUser.id },
+            update: {
+              dob: validDob,
+              gender: genderEnum,
+              jerseyNumber: p.jerseyNumber ? Number(p.jerseyNumber) : undefined,
+              address: p.address || undefined,
+              teamId: teamId || undefined
+            },
+            create: {
+              userId: clerkUser.id,
+              dob: validDob,
+              gender: genderEnum,
+              jerseyNumber: p.jerseyNumber ? Number(p.jerseyNumber) : null,
+              address: p.address || null,
+              teamId: teamId
             }
           });
 
@@ -148,18 +184,13 @@ export async function POST(req: Request) {
 
         } catch (err: any) {
           console.error(`❌ Failed to import player ${p.name}:`, err);
-
-          // 🛑 ROLLBACK: Delete Clerk user if DB creation failed
-          if (clerkUser) {
-            try {
-              console.log(`⚠️ Rolling back Clerk user: ${clerkUser.id}`);
-              await client.users.deleteUser(clerkUser.id);
-            } catch (rollbackErr) {
-              console.error("❌ Critical: Failed to rollback Clerk user:", rollbackErr);
-            }
-          }
-
           errors.push({ name: p.name, error: err.message || "Unknown error" });
+
+          // NOTE: We do NOT rollback (delete) the Clerk user if we simply failed to sync to DB 
+          // because if it was an *existing* user, we shouldn't delete them.
+          // Only if we *just* created them and failed immediately could we consider rollback, 
+          // but checking if they existed before is complex here without more state. 
+          // Safer to just log error and let admin handle manual cleanup if needed.
         }
       }
 

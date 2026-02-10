@@ -63,10 +63,10 @@ const PlayerForm = ({
   } = useForm<Inputs>({
     resolver: zodResolver(schema),
     defaultValues: {
-      username: data?.username, // ✅ Maps correctly now
-      parentEmail: data?.parentEmail || data?.email, // Handle both cases
-      name: data?.name, // ✅ Maps Full Name
-      phone: data?.phone || "", // ✅ Added Phone
+      username: data?.username || data?.user?.username, // ✅ Handle both flat and nested (Prisma) data
+      parentEmail: data?.parentEmail || data?.email || data?.user?.email,
+      name: data?.name || data?.user?.name,
+      phone: data?.phone || data?.user?.phone || "",
       address: data?.address,
       gender: data?.gender,
       dob: data?.dob ? new Date(data.dob).toISOString().split('T')[0] : "",

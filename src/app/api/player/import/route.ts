@@ -141,17 +141,21 @@ export async function POST(req: Request) {
 
           // 2. Upsert User in Database
           // We use upsert to ensure we don't fail if the user exists in DB but not linked correctly.
+          // 2. Upsert User in Database
           const newItem = await prisma.user.upsert({
             where: { id: clerkUser.id },
             update: {
               name: p.name || undefined,
               phone: p.phone ? String(p.phone) : undefined,
-              // Note: We DO NOT update username/userCode for existing users to prevent breaking valid logins
+              // Change: Now we sync the username and userCode from Clerk to our DB
+              username: finalUsername,
+              userCode: finalUserCode,
             },
             create: {
               id: clerkUser.id,
               username: finalUsername, // PL-XXXXXX
               userCode: finalUserCode, // PL-XXXXXX
+
               name: p.name || "Unknown Player",
               email: email,
               phone: p.phone ? String(p.phone) : null,

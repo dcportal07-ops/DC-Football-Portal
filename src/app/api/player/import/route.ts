@@ -85,6 +85,8 @@ export async function POST(req: Request) {
 
       for (const p of players) {
         let clerkUser: any = null;
+        let finalUsername = "";
+        let finalUserCode = "";
 
         try {
           const email = p.email;
@@ -106,11 +108,19 @@ export async function POST(req: Request) {
             // User exists! Use this user.
             clerkUser = existingUsers.data[0];
             console.log(`⚠️ User already exists in Clerk: ${clerkUser.id}`);
+
+            // 🔥 CRITICAL FIX: Trust existing username. 
+            // If they have a username, use it for DB code too (if compatible) or keep existing code.
+            // But for this import logic, let's assume valid usernames are the codes.
+            finalUsername = clerkUser.username || `player_${Date.now()}`;
+            finalUserCode = finalUsername; // Ideally, username IS the code.
+
           } else {
             // User does not exist, Create new.
+            // 🔥 CRITICAL FIX: Generate ONCE, use EVERYWHERE.
             const uniqueRandom = `PL-${Math.floor(100000 + Math.random() * 900000)}`;
-            const username = uniqueRandom; // ✅ Use PL-XXXXXX as username
-            const userCode = uniqueRandom; // Also store as userCode
+            finalUsername = uniqueRandom;
+            finalUserCode = uniqueRandom;
 
             try {
               console.log(`🟢 Creating Clerk User: ${email}`);
@@ -119,7 +129,7 @@ export async function POST(req: Request) {
                 password: "dcPl@yer00",
                 firstName: p.name?.split(" ")[0] || "Player",
                 lastName: p.name?.split(" ").slice(1).join(" ") || "",
-                username: username,
+                username: finalUsername, // Use strict PL-XXXXXX
                 publicMetadata: { role: "player" }
               });
               console.log(`✅ Clerk User Created: ${clerkUser.id}`);
@@ -130,27 +140,18 @@ export async function POST(req: Request) {
           }
 
           // 2. Upsert User in Database
-          // We use upsert to ensure we don't fail if the user exists in DB but not linked correctly, or vice versa updates.
-          // Note: If user exists, we might want to update their info? For now, let's ensure they exist.
-
-          // We need a unique username for DB too if we are creating. 
-          // If we reused Clerk user, they have a username.
-
-          let dbUsername = clerkUser.username || `player_${Date.now()}`;
-          let dbUserCode = `PL-${Math.floor(100000 + Math.random() * 900000)}`;
-
+          // We use upsert to ensure we don't fail if the user exists in DB but not linked correctly.
           const newItem = await prisma.user.upsert({
             where: { id: clerkUser.id },
             update: {
-              // If you want to update fields on re-import, do it here. 
-              // For now, we keep existing data to be safe, or maybe update name/phone?
               name: p.name || undefined,
               phone: p.phone ? String(p.phone) : undefined,
+              // Note: We DO NOT update username/userCode for existing users to prevent breaking valid logins
             },
             create: {
               id: clerkUser.id,
-              username: dbUsername,
-              userCode: dbUserCode,
+              username: finalUsername, // PL-XXXXXX
+              userCode: finalUserCode, // PL-XXXXXX
               name: p.name || "Unknown Player",
               email: email,
               phone: p.phone ? String(p.phone) : null,

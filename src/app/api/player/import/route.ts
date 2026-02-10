@@ -108,9 +108,9 @@ export async function POST(req: Request) {
             console.log(`⚠️ User already exists in Clerk: ${clerkUser.id}`);
           } else {
             // User does not exist, Create new.
-            const uniqueSuffix = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
-            const username = `player_${uniqueSuffix}`;
-            const userCode = `PL-${Math.floor(100000 + Math.random() * 900000)}`;
+            const uniqueRandom = `PL-${Math.floor(100000 + Math.random() * 900000)}`;
+            const username = uniqueRandom; // ✅ Use PL-XXXXXX as username
+            const userCode = uniqueRandom; // Also store as userCode
 
             try {
               console.log(`🟢 Creating Clerk User: ${email}`);
